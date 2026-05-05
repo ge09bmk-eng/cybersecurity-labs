@@ -65,5 +65,6 @@ Percorso di studio focalizzato su:
 - [Nmap Notes](nmap-notes.md)
 - [Metasploit Notes](metasploit-notes.md)
 - [Linux Commands](linux-commands.md)
+- [eJPT Checklist](ejpt-checklist.md)
 
 Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
