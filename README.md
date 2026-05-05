@@ -63,5 +63,6 @@ Percorso di studio focalizzato su:
 ## ## Note tecniche
 
 - [Nmap Notes](nmap-notes.md)
+- - [Metasploit Notes](metasploit-notes.md)
 
 Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
