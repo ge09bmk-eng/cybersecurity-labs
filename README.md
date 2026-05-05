@@ -39,14 +39,14 @@ Attività principali:
 - Vulnerability assessment con Nessus
 - Test firewall e filtraggio porte
 
-### Penetration Testing Lab
+### Penetration Testing Lab (Kali Linux)
 
 Esercitazioni pratiche su target vulnerabili in ambiente controllato.
 
 Attività principali:
 
 - Enumeration con Nmap
-- Exploitation con Metasploit
+- Exploitation con Metasploit (reverse shell)
 - Accesso via FTP/SSH
 - Analisi web con Gobuster
 - Privilege escalation con sudo e GTFOBins
