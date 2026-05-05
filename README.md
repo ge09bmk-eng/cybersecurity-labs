@@ -60,6 +60,8 @@ Percorso di studio focalizzato su:
 - Host and Networking Auditing
 - Web Application Penetration Testing
 
-## Note
+## ## Note tecniche
+
+- [Nmap Notes](nmap-notes.md)
 
 Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
