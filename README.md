@@ -68,5 +68,6 @@ Percorso di studio focalizzato su:
 - [eJPT Checklist](ejpt-checklist.md)
 - [Web Enumeration Notes](web-enumeration.md)
 - [SMB Enumeration Notes](smb-enumeration.md)
+- [Metasploitable2 Lab](metasploitable2-lab.md)
 
 Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
