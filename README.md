@@ -66,5 +66,6 @@ Percorso di studio focalizzato su:
 - [Metasploit Notes](metasploit-notes.md)
 - [Linux Commands](linux-commands.md)
 - [eJPT Checklist](ejpt-checklist.md)
+- [Web Enumeration Notes](web-enumeration.md)
 
 Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
