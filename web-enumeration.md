@@ -8,7 +8,7 @@ Appunti personali su web enumeration, fingerprinting e raccolta informazioni per
 
 ## 1. Web Fingerprinting
 
-Obiettivo: identificare tecnologie, server web, versioni e header HTTP.
+Obiettivo: identificare tecnologie, server web, versioni, header HTTP e possibili superfici interessanti.
 
 ```bash
 whatweb http://TARGET
@@ -24,20 +24,21 @@ curl -I http://192.168.1.100
 
 Informazioni utili da cercare:
 
-- Server web
-- Versione Apache/Nginx
-- Versione PHP
-- Header interessanti
-- Cookie
-- Redirect
-- WebDAV
-- Pagine di login
+* Server web
+* Versione Apache/Nginx
+* Versione PHP
+* Header interessanti
+* Cookie
+* Redirect
+* WebDAV
+* Pagine di login
+* Directory o applicazioni esposte
 
 ---
 
 ## 2. HTTP Methods
 
-Obiettivo: verificare quali metodi HTTP sono abilitati.
+Obiettivo: verificare quali metodi HTTP sono abilitati sul server web.
 
 ```bash
 nmap --script http-methods -p 80 TARGET
@@ -58,7 +59,7 @@ Supported Methods: GET HEAD POST OPTIONS
 Interpretazione:
 
 ```text
-GET/POST/HEAD/OPTIONS = normale
+GET/POST/HEAD/OPTIONS = comportamento normale
 PUT presente = possibile upload da verificare solo in laboratorio autorizzato
 DELETE presente = configurazione pericolosa
 ```
@@ -81,17 +82,18 @@ gobuster dir -u http://192.168.1.100 -w /usr/share/wordlists/dirb/common.txt
 
 Directory interessanti:
 
-- `/admin`
-- `/login`
-- `/backup`
-- `/config`
-- `/uploads`
-- `/dav`
-- `/phpMyAdmin`
-- `/phpinfo.php`
-- `/test`
-- `/twiki`
-- `/cgi-bin`
+* `/admin`
+* `/login`
+* `/backup`
+* `/config`
+* `/uploads`
+* `/dav`
+* `/phpMyAdmin`
+* `/phpinfo.php`
+* `/test`
+* `/twiki`
+* `/cgi-bin`
+* `/server-status`
 
 ---
 
@@ -115,13 +117,13 @@ curl -s http://192.168.1.100/phpinfo.php | grep -i "disable_functions"
 
 Cosa cercare:
 
-- Document root
-- Versione PHP
-- Server software
-- Funzioni PHP disabilitate
-- Path locali
-- Moduli caricati
-- Variabili ambiente
+* Document root
+* Versione PHP
+* Server software
+* Funzioni PHP disabilitate
+* Path locali
+* Moduli caricati
+* Variabili ambiente
 
 Risultati esempio su Metasploitable2:
 
@@ -184,28 +186,61 @@ Esempio:
 http://192.168.1.100/phpMyAdmin/
 ```
 
-Provare prima credenziali note o trovate durante enumeration, senza brute force inutile.
+Prima di usare tecniche più invasive, provare solo credenziali note, deboli o trovate durante l’enumerazione.
+
+Esempi di controllo manuale in laboratorio:
+
+```text
+root / root
+root / password
+root / vuoto
+admin / admin
+```
+
+Se l’accesso non funziona:
+
+```text
+Non insistere su phpMyAdmin.
+Passare a credential hunting tramite altri servizi come SMB, NFS, FTP, database o file web.
+```
 
 ---
 
 ## 6. WebDAV
 
-Se `whatweb` o gli header mostrano `DAV/2`, verificare i metodi HTTP:
+Se `whatweb`, `curl -I` o gli header mostrano `DAV/2`, verificare i metodi HTTP supportati.
+
+Controllo generale sulla porta 80:
 
 ```bash
 nmap --script http-methods -p 80 TARGET
 ```
 
-Se `PUT` non è presente:
+Controllo specifico sulla directory `/dav/`:
 
-```text
-WebDAV presente, ma upload diretto non disponibile sulla porta testata.
+```bash
+curl -i -X OPTIONS http://TARGET/dav/
+nmap --script http-methods --script-args http-methods.url-path=/dav/ -p 80 TARGET
 ```
 
-Se `PUT` è presente:
+Esempio su Metasploitable2:
+
+```bash
+curl -i -X OPTIONS http://192.168.1.100/dav/
+nmap --script http-methods --script-args http-methods.url-path=/dav/ -p 80 192.168.1.100
+```
+
+Interpretazione:
 
 ```text
-Verificare solo in laboratorio autorizzato se è possibile caricare file.
+Se PUT è abilitato → possibile upload da verificare solo in laboratorio autorizzato.
+Se PUT non è presente → WebDAV esiste, ma upload diretto non disponibile sulla porta testata.
+```
+
+Regola mentale:
+
+```text
+Vedo DAV/2 oppure /dav/ → controllo i metodi HTTP.
 ```
 
 ---
@@ -229,6 +264,8 @@ curl -I http://192.168.1.100/phpMyAdmin/
 curl -s http://192.168.1.100/phpinfo.php | grep -i "document_root"
 curl -s http://192.168.1.100/phpinfo.php | grep -i "server_software"
 curl -s http://192.168.1.100/phpinfo.php | grep -i "disable_functions"
+curl -i -X OPTIONS http://192.168.1.100/dav/
+nmap --script http-methods --script-args http-methods.url-path=/dav/ -p 80 192.168.1.100
 ```
 
 Risultati importanti:
@@ -266,11 +303,33 @@ Flusso corretto:
 4. Cerco directory e file nascosti
 5. Analizzo pagine interessanti
 6. Cerco credenziali o configurazioni
-7. Solo dopo scelgo eventuale exploit
+7. Se non trovo accesso, passo ad altri servizi
+8. Solo dopo scelgo eventuale exploit
 ```
 
 Regola importante:
 
 ```text
 Enumeration first, exploitation later.
+```
+
+---
+
+## 9. Decisione pratica
+
+Esempio di ragionamento su Metasploitable2:
+
+```text
+FTP anonymous → accesso riuscito ma directory vuota
+HTTP → Apache/PHP/WebDAV
+Gobuster → phpMyAdmin, phpinfo.php, /dav, /twiki, /test
+phpMyAdmin → raggiungibile ma login non riuscito
+/dav → controllare metodi HTTP
+Se non ottengo accesso dal web → passare a SMB enumeration
+```
+
+Quando il web non porta accesso diretto:
+
+```text
+Passare a SMB, NFS, database, SSH/Telnet o servizi con versioni vulnerabili.
 ```
