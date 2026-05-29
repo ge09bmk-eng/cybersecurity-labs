@@ -221,7 +221,115 @@ PHP 5.2.4
 Title: Metasploitable2 - Linux
 WebDAV presente
 ```
+## 7.1 WebDAV PROPFIND Enumeration
 
+Durante la web enumeration è stata individuata la directory:
+
+```text
+/dav/
+```
+
+Il server mostrava supporto WebDAV:
+
+```text
+Apache/2.2.8 (Ubuntu) DAV/2
+```
+
+Controllo dei metodi HTTP sulla directory `/dav/`:
+
+```bash
+curl -i -X OPTIONS http://192.168.1.100/dav/
+```
+
+Risultato importante:
+
+```text
+HTTP/1.1 200 OK
+Server: Apache/2.2.8 (Ubuntu) DAV/2
+DAV: 1,2
+MS-Author-Via: DAV
+Allow: OPTIONS,GET,HEAD,POST,DELETE,TRACE,PROPFIND,PROPPATCH,COPY,MOVE,LOCK,UNLOCK
+```
+
+Interpretazione:
+
+```text
+WebDAV è attivo su /dav/.
+Sono presenti diversi metodi WebDAV rischiosi.
+Il metodo PUT non risulta abilitato, quindi upload diretto non disponibile.
+```
+
+Controllo con Nmap:
+
+```bash
+nmap --script http-methods --script-args http-methods.url-path=/dav/ -p 80 192.168.1.100
+```
+
+Risultato:
+
+```text
+Supported Methods: OPTIONS GET HEAD POST DELETE TRACE PROPFIND PROPPATCH COPY MOVE LOCK UNLOCK
+Potentially risky methods: DELETE TRACE PROPFIND PROPPATCH COPY MOVE LOCK UNLOCK
+Path tested: /dav/
+```
+
+Prima richiesta PROPFIND:
+
+```bash
+curl -i -X PROPFIND http://192.168.1.100/dav/
+```
+
+Risultato:
+
+```text
+HTTP/1.1 403 Forbidden
+PROPFIND requests with a Depth of "infinity" are not allowed for /dav/.
+```
+
+Interpretazione:
+
+```text
+La richiesta PROPFIND senza header Depth viene interpretata come richiesta troppo ampia.
+Il server blocca Depth infinity.
+```
+
+Richiesta corretta con Depth 0:
+
+```bash
+curl -i -X PROPFIND -H "Depth: 0" http://192.168.1.100/dav/
+```
+
+Richiesta corretta con Depth 1:
+
+```bash
+curl -i -X PROPFIND -H "Depth: 1" http://192.168.1.100/dav/
+```
+
+Risultato:
+
+```text
+HTTP/1.1 207 Multi-Status
+<D:href>/dav/</D:href>
+<lp1:resourcetype><D:collection/></lp1:resourcetype>
+<D:getcontenttype>httpd/unix-directory</D:getcontenttype>
+```
+
+Interpretazione:
+
+```text
+PROPFIND funziona se viene specificato l’header Depth.
+La directory /dav/ è una collection WebDAV.
+Non sono stati trovati file utili all’interno della directory.
+```
+
+Conclusione:
+
+```text
+WebDAV è attivo e configurato con metodi rischiosi.
+PUT non è presente, quindi non è stato possibile eseguire upload diretto tramite WebDAV.
+PROPFIND con Depth 0/1 funziona, ma non espone file utili.
+Il ramo WebDAV è stato documentato e poi abbandonato come vettore di accesso iniziale.
+```
 Controllo metodi HTTP:
 
 ```bash
