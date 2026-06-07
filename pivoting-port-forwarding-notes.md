@@ -697,9 +697,248 @@ Su Kali, terminale 2:
 ```bash
 curl http://127.0.0.1:8088
 ```
+## 21. Route Pivoting verso rete interna
+
+Dopo aver dimostrato il port forwarding SSH e web, è stato configurato anche il route pivoting per raggiungere direttamente la rete interna `10.10.10.0/24` passando da Metasploitable2.
+
+---
+
+### 21.1 Obiettivo
+
+L’obiettivo era permettere a Kali di raggiungere direttamente Target3 sulla rete interna:
+
+```text
+Target3 interno: 10.10.10.2
+Rete interna: 10.10.10.0/24
+Gateway/Pivot: Metasploitable2 192.168.1.100
+```
+
+Schema:
+
+```text
+Kali
+192.168.1.101
+        ↓
+route verso 10.10.10.0/24
+        ↓
+Metasploitable2
+192.168.1.100 / 10.10.10.1
+        ↓
+Target3
+10.10.10.2
+```
+
+---
+
+### 21.2 Abilitazione IP forwarding su Metasploitable2
+
+Su Metasploitable2 è stato abilitato l’IP forwarding:
+
+```bash
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+```
+
+Verifica:
+
+```bash
+cat /proc/sys/net/ipv4/ip_forward
+```
+
+Output:
+
+```text
+1
+```
+
+Interpretazione:
+
+```text
+Metasploitable2 può inoltrare traffico tra le sue interfacce di rete.
+```
+
+---
+
+### 21.3 Aggiunta route su Kali
+
+Su Kali è stata aggiunta una route verso la rete interna:
+
+```bash
+sudo ip route add 10.10.10.0/24 via 192.168.1.100
+```
+
+Verifica:
+
+```bash
+ip route
+```
+
+Output importante:
+
+```text
+10.10.10.0/24 via 192.168.1.100 dev eth1
+```
+
+Interpretazione:
+
+```text
+Kali invia il traffico destinato alla rete 10.10.10.0/24 verso Metasploitable2.
+Metasploitable2 agisce come gateway/pivot.
+```
+
+---
+
+### 21.4 Test di raggiungibilità
+
+Da Kali:
+
+```bash
+ping -c 3 10.10.10.2
+```
+
+Output:
+
+```text
+64 bytes from 10.10.10.2: icmp_seq=1 ttl=64 time=5.28 ms
+64 bytes from 10.10.10.2: icmp_seq=2 ttl=64 time=1.67 ms
+64 bytes from 10.10.10.2: icmp_seq=3 ttl=64 time=3.89 ms
+
+3 packets transmitted, 3 received, 0% packet loss
+```
+
+Interpretazione:
+
+```text
+Kali riesce a raggiungere Target3 sulla rete interna usando Metasploitable2 come router.
+```
+
+---
+
+### 21.5 Scansione servizi interni tramite route
+
+Da Kali:
+
+```bash
+nmap -sV -p 22,8000 10.10.10.2
+```
+
+Output:
+
+```text
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 10.2p1 Ubuntu 2ubuntu3
+8000/tcp open  http    SimpleHTTPServer 0.6 (Python 3.14.4)
+```
+
+Interpretazione:
+
+```text
+Kali riesce a fare enumeration diretta dei servizi interni di Target3.
+Il traffico passa dalla route verso Metasploitable2.
+```
+
+---
+
+### 21.6 Differenza tra port forwarding e route pivoting
+
+Port forwarding:
+
+```text
+Kali usa una porta locale, per esempio 127.0.0.1:8088.
+Il tunnel inoltra solo una porta specifica verso il target interno.
+```
+
+Route pivoting:
+
+```text
+Kali aggiunge una route verso tutta la rete interna.
+Il traffico verso 10.10.10.0/24 passa attraverso Metasploitable2.
+Permette ping, scansioni e accesso diretto agli host interni.
+```
+
+---
+
+### 21.7 Catena completa
+
+```text
+Metasploitable2 ha due reti:
+eth0 = 192.168.1.100
+eth1 = 10.10.10.1
+
+Target3 è nella rete interna:
+10.10.10.2
+
+Metasploitable2 ha ip_forward attivo:
+cat /proc/sys/net/ipv4/ip_forward = 1
+
+Kali aggiunge la route:
+10.10.10.0/24 via 192.168.1.100
+
+Kali raggiunge Target3:
+ping 10.10.10.2 = OK
+
+Kali enumera servizi interni:
+nmap -sV -p 22,8000 10.10.10.2 = OK
+```
+
+---
+
+### 21.8 Comandi rapidi
+
+Su Metasploitable2:
+
+```bash
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+cat /proc/sys/net/ipv4/ip_forward
+```
+
+Su Kali:
+
+```bash
+sudo ip route add 10.10.10.0/24 via 192.168.1.100
+ip route
+ping -c 3 10.10.10.2
+nmap -sV -p 22,8000 10.10.10.2
+```
+
+Per rimuovere la route da Kali:
+
+```bash
+sudo ip route del 10.10.10.0/24 via 192.168.1.100
+```
+
+---
+
+### 21.9 Collegamento con eJPT
+
+Questa esercitazione copre:
+
+```text
+Pivoting
+Aggiunta route
+Raggiungimento rete interna
+Enumeration di host interni
+Service scanning attraverso macchina ponte
+Comprensione routing tra reti
+```
+
+---
+
+### 21.10 Risultato finale
+
+Il route pivoting è riuscito.
+
+Kali ha raggiunto Target3 sulla rete interna `10.10.10.0/24` usando Metasploitable2 come macchina ponte.
+
+Risultato finale:
+
+```text
+Kali → Metasploitable2 → Target3 interno
+```
+
+Questa prova dimostra la capacità di raggiungere ed enumerare host interni non direttamente accessibili in origine.
 
 
-## 20.8 Nota etica
+## 21.11 Nota etica
 Questa attività è stata svolta solo in laboratorio locale autorizzato.
 
 Non usare tecniche di pivoting, tunneling o port forwarding su reti reali senza autorizzazione esplicita.
