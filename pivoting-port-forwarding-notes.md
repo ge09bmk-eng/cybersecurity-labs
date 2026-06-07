@@ -478,8 +478,228 @@ Conclusione:
 ```text
 L’enumeration attraverso il tunnel è riuscita.
 Nmap vede il servizio SSH interno di Target3 passando dal port forwarding.
+
+
 ```
-## 19. Nota etica
+## 20. Pivoting verso servizio web interno
+
+Dopo aver verificato il pivoting SSH verso Target3, è stato configurato anche un servizio web interno su Target3 per dimostrare che il port forwarding può essere usato per raggiungere servizi diversi da SSH.
+
+---
+
+### 20.1 Servizio web interno su Target3
+
+Su Target3 è stata configurata l’interfaccia interna:
+
+```text
+enp0s8 = 10.10.10.2/24
+```
+
+È stata creata una directory web:
+
+```bash
+mkdir -p ~/internal-web
+cd ~/internal-web
+```
+
+È stato creato un file `index.html`:
+
+```bash
+echo "servizio web interno Target3" > index.html
+```
+
+È stato avviato un server HTTP Python sulla rete interna:
+
+```bash
+python3 -m http.server 8000 --bind 10.10.10.2
+```
+
+Output corretto:
+
+```text
+Serving HTTP on 10.10.10.2 port 8000
+```
+
+Interpretazione:
+
+```text
+Target3 sta esponendo un servizio web solo sulla rete interna 10.10.10.0/24.
+```
+
+---
+
+### 20.2 Verifica da Metasploitable2
+
+Da Metasploitable2 è stato testato il servizio interno:
+
+```bash
+wget -qO- http://10.10.10.2:8000
+```
+
+Output ottenuto:
+
+```text
+servizio web interno Target3
+```
+
+Interpretazione:
+
+```text
+Metasploitable2 riesce a raggiungere il servizio web interno di Target3.
+```
+
+Nota sull’errore incontrato:
+
+```text
+È stato inizialmente scritto -q0- con il numero zero.
+Il comando corretto usa la lettera O maiuscola:
+-qO-
+```
+
+Comando corretto:
+
+```bash
+wget -qO- http://10.10.10.2:8000
+```
+
+---
+
+### 20.3 Creazione tunnel web da Kali
+
+Da Kali è stato creato un tunnel SSH verso Metasploitable2:
+
+```bash
+ssh -oHostKeyAlgorithms=+ssh-rsa -oPubkeyAcceptedAlgorithms=+ssh-rsa -L 8088:10.10.10.2:8000 msfadmin@192.168.1.100
+```
+
+Significato del tunnel:
+
+```text
+-L 8088:10.10.10.2:8000
+```
+
+Interpretazione:
+
+```text
+Kali apre localmente la porta 8088.
+Il traffico verso 127.0.0.1:8088 viene inviato attraverso Metasploitable2.
+Metasploitable2 inoltra il traffico verso Target3 10.10.10.2 porta 8000.
+```
+
+Schema:
+
+```text
+Kali 127.0.0.1:8088
+        ↓
+Tunnel SSH
+        ↓
+Metasploitable2
+        ↓
+Target3 10.10.10.2:8000
+```
+
+---
+
+### 20.4 Verifica da Kali
+
+Da un secondo terminale Kali è stato eseguito:
+
+```bash
+curl http://127.0.0.1:8088
+```
+
+Output ottenuto:
+
+```text
+servizio web interno Target3
+```
+
+Interpretazione:
+
+```text
+Kali ha raggiunto un servizio web interno non accessibile direttamente.
+Il traffico è passato attraverso il tunnel SSH e la macchina ponte Metasploitable2.
+```
+
+---
+
+### 20.5 Risultato finale
+
+Il pivoting web è riuscito.
+
+Catena dimostrata:
+
+```text
+Kali
+127.0.0.1:8088
+↓
+SSH tunnel
+↓
+Metasploitable2
+192.168.1.100 / 10.10.10.1
+↓
+Target3
+10.10.10.2:8000
+↓
+Servizio web interno
+```
+
+Conclusione:
+
+```text
+È stato dimostrato che il port forwarding permette di raggiungere servizi interni nascosti.
+Non solo SSH, ma anche HTTP e altri servizi TCP possono essere inoltrati tramite tunnel.
+```
+
+---
+
+### 20.6 Collegamento con eJPT
+
+Questa esercitazione copre:
+
+```text
+Pivoting
+Port forwarding
+Accesso a servizi interni
+Uso di una macchina ponte
+Enumerazione e accesso a servizi non raggiungibili direttamente
+```
+
+---
+
+### 20.7 Comandi rapidi
+
+Su Target3:
+
+```bash
+sudo ip addr add 10.10.10.2/24 dev enp0s8
+sudo ip link set enp0s8 up
+mkdir -p ~/internal-web
+cd ~/internal-web
+echo "servizio web interno Target3" > index.html
+python3 -m http.server 8000 --bind 10.10.10.2
+```
+
+Su Metasploitable2:
+
+```bash
+wget -qO- http://10.10.10.2:8000
+```
+
+Su Kali, terminale 1:
+
+```bash
+ssh -oHostKeyAlgorithms=+ssh-rsa -oPubkeyAcceptedAlgorithms=+ssh-rsa -L 8088:10.10.10.2:8000 msfadmin@192.168.1.100
+```
+
+Su Kali, terminale 2:
+
+```bash
+curl http://127.0.0.1:8088
+```
+
+
+## 20.8 Nota etica
 Questa attività è stata svolta solo in laboratorio locale autorizzato.
 
 Non usare tecniche di pivoting, tunneling o port forwarding su reti reali senza autorizzazione esplicita.
