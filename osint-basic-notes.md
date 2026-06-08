@@ -366,8 +366,56 @@ Le informazioni OSINT vanno valutate per impatto e criticità.
 ```
 
 ---
+## 17. HTTP Headers con curl
 
-## 17. Nota etica
+Comando:
+
+```bash
+curl -I http://example.com
+```
+
+Output osservato:
+
+```text
+HTTP/1.1 200 OK
+Date: Mon, 08 Jun 2026 13:21:50 GMT
+Content-Type: text/html
+Connection: keep-alive
+Server: cloudflare
+Last-Modified: Fri, 05 Jun 2026 20:00:44 GMT
+Allow: GET, HEAD
+Accept-Ranges: bytes
+Age: 10185
+cf-cache-status: HIT
+CF-RAY: a08833b09aeaee8d-MXP
+```
+
+Interpretazione:
+
+```text
+HTTP/1.1 200 OK indica che il sito risponde correttamente.
+Content-Type: text/html indica che il contenuto restituito è HTML.
+Server: cloudflare indica che il sito è servito tramite Cloudflare.
+Allow: GET, HEAD indica i metodi HTTP consentiti.
+cf-cache-status: HIT indica che la risposta è stata servita dalla cache Cloudflare.
+CF-RAY è un identificativo Cloudflare della richiesta.
+```
+
+Valutazione:
+
+```text
+Gli header raccolti sono informazioni pubbliche.
+Non indicano da soli una vulnerabilità.
+Sono utili per capire tecnologia, caching, server front-end e comportamento HTTP.
+```
+
+Criticità:
+
+```text
+Informational / Low
+```
+
+## 18. Nota etica
 
 Questa attività è stata svolta su un dominio pubblico di esempio.
 
