@@ -1,24 +1,29 @@
-# Cybersecurity Labs
+# # Cybersecurity Labs
 
-Repository personale dedicato allo studio della cybersecurity, del penetration testing e alla preparazione della certificazione eJPT.
+Repository personale dedicato allo studio della cybersecurity, del penetration testing e della sicurezza delle reti informatiche.
+
+**Certificazione conseguita: INE eJPT – Junior Penetration Tester (22 ottobre 2026).**
+
+Questo repository raccoglie appunti tecnici, esercitazioni pratiche e laboratori realizzati durante il mio percorso di formazione in cybersecurity e di preparazione alla certificazione eJPT.
 
 ## Obiettivo
 
-Documentare esercitazioni pratiche svolte in ambienti di laboratorio virtuale, con focus su:
+Documentare esercitazioni pratiche svolte in ambienti di laboratorio virtuale, con particolare attenzione a:
 
-- Network scanning
+- Network Scanning
 - Enumeration
-- Web application testing
+- Web Application Testing
 - Exploitation
-- Privilege escalation
+- Privilege Escalation
 - Pivoting
-- Post-exploitation
+- Post-Exploitation
+- Vulnerability Assessment
 
 ## Strumenti utilizzati
 
 - Kali Linux
 - Nmap
-- Metasploit
+- Metasploit Framework
 - Wireshark
 - Nessus
 - Gobuster
@@ -33,41 +38,49 @@ Ambiente virtuale con Kali Linux, IPFire, Ubuntu e Metasploitable2.
 
 Attività principali:
 
-- Configurazione di rete segmentata
-- Analisi traffico
-- Scansione con Nmap
-- Vulnerability assessment con Nessus
-- Test firewall e filtraggio porte
+- Configurazione di reti segmentate
+- Analisi del traffico di rete con Wireshark
+- Scansione delle porte e dei servizi con Nmap
+- Vulnerability Assessment con Nessus
+- Configurazione e verifica delle regole firewall con IPFire
 
 ### Penetration Testing Lab (Kali Linux)
 
-Esercitazioni pratiche su target vulnerabili in ambiente controllato.
+Esercitazioni pratiche su sistemi vulnerabili in ambienti virtuali autorizzati.
 
 Attività principali:
 
-- Enumeration con Nmap
-- Exploitation con Metasploit (reverse shell)
-- Accesso via FTP/SSH
-- Analisi web con Gobuster
-- Privilege escalation con sudo e GTFOBins
+- Scansione ed enumerazione con Nmap
+- Exploitation con Metasploit Framework
+- Analisi dei servizi FTP e SSH
+- Enumerazione delle applicazioni web con Gobuster
+- Privilege Escalation con sudo e GTFOBins
 
-## Preparazione eJPT
+## Percorso INE eJPT – Certificazione conseguita
 
-Percorso di studio focalizzato su:
+Certificazione **INE Security eJPT (Junior Penetration Tester)** conseguita il **22 ottobre 2026**.
+
+Il percorso di preparazione ha incluso esercitazioni pratiche e laboratori dedicati a:
 
 - Assessment Methodologies
 - Host and Network Penetration Testing
-- Host and Networking Auditing
+- Host and Network Auditing
 - Web Application Penetration Testing
+
+Le attività svolte hanno contribuito a consolidare competenze pratiche di ricognizione, enumerazione, exploitation, post-exploitation e pivoting.
 
 ## Note tecniche
 
-- [Nmap Notes](nmap-notes.md)
-- [Metasploit Notes](metasploit-notes.md)
-- [Linux Commands](linux-commands.md)
-- [eJPT Checklist](ejpt-checklist.md)
-- [Web Enumeration Notes](web-enumeration.md)
-- [SMB Enumeration Notes](smb-enumeration.md)
-- [Metasploitable2 Lab](metasploitable2-lab.md)
+- [Nmap Notes](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/nmap-notes.md)
+- [Metasploit Notes](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/metasploit-notes.md)
+- [Linux Commands](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/linux-commands.md)
+- [eJPT Checklist](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/ejpt-checklist.md)
+- [Web Enumeration Notes](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/web-enumeration.md)
+- [SMB Enumeration Notes](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/smb-enumeration.md)
+- [Metasploitable2 Lab](https://github.com/ge09bmk-eng/cybersecurity-labs/blob/main/metasploitable2-lab.md)
 
-Tutti i contenuti sono realizzati in ambienti di laboratorio autorizzati e controllati a scopo formativo.
+## Nota sulla sicurezza
+
+Tutti i contenuti sono relativi ad attività formative, esercitazioni e test svolti esclusivamente in ambienti di laboratorio autorizzati e controllati.
+
+Il materiale è pubblicato a scopo educativo e per documentare il mio percorso di apprendimento nella cybersecurity.
